@@ -1,0 +1,118 @@
+---
+title: "Practical Machine Learning"
+author: "MC"
+date: "2022-10-30"
+output: html_document
+---
+## Packages, language
+```{r packages, warning=FALSE}
+Sys.setlocale("LC_ALL", "English")
+library(readr)
+library(caret)
+library(corrplot)
+library(rattle)
+library(randomForest)
+library(kernlab)
+set.seed(12345)
+```
+
+## Data import, datasets
+Importing data into 2 data sets.
+
+```{r import, warning=FALSE}
+
+train<- read_delim("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", col_names=T,)
+test<-read_delim("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", col_names=T)
+
+dim(train)
+dim(test)
+```
+## Preprocessing
+Variables have a high number of NA, Near Zero Variance (NZV) and Id. Preprocessing will removed them.
+removing NA column (mostly NA values, and columns with metadata)
+```{r preprocessing}
+nvz <- nearZeroVar(train)
+train <- train[,-nvz]
+
+train <- train[,colMeans(is.na(train)) < 0.9]
+train <- train[,-c(1:7)]
+dim(train)
+
+```
+52 variables left after preprocessing
+
+## Data analysis
+Pearson correlation coefficient
+```{r correlation}
+p_cor<-round(cor(train[,-52]),2)
+corrplot(p_cor, order = "hclust" , type = "upper",tl.cex = 0.5)
+high_corr<-findCorrelation(p_cor, cutoff=0.75)
+names(train)[high_corr]
+```
+The more intensive correlation color and the bigger dot is presened, the higher correlation is observed between pair of variables. The highest negative Pearson's correlation coefficient is between pitch_belt and accel_belt_x (-0.97), accel_belt_z and total_accel_belt (-0.97)
+
+## Modeling
+Divinding data (train dataset) into training and validation dataset 
+
+```{r datasets}
+partition <- createDataPartition(y=train$classe, p=0.7, list=F)
+training <- train[partition,]
+validation <- train[-partition,]
+```
+
+Model 1: Decision tree
+random seed number (12345)
+3-fold cross validation
+
+```{r tree1}
+set.seed(12345)
+control <- trainControl(method="cv", number=3, verboseIter=FALSE)
+
+tree1 <- train(classe~., data=training, method="rpart", trControl = control, tuneLength = 5)
+fancyRpartPlot(tree1$finalModel)
+```
+Model quality:
+```{r tree1_quality}
+valid_tree1 <- predict(tree1, validation)
+confmat_tree1<- confusionMatrix(valid_tree1, as.factor(validation$classe))
+confmat_tree1
+```
+## Model 2: Random Forest
+
+```{r tree2}
+set.seed(12345)
+tree2 <- train(classe~., data=training, method="rf", trControl = control, tuneLength = 5)
+
+```
+Model quality:
+```{r tree2_quality}
+valid_tree2<- predict(tree2, validation)
+confmat_tree2<- confusionMatrix(valid_tree2, as.factor(validation$classe))
+confmat_tree2
+```
+
+## Model 3: Support Vector Machine
+```{r svm}
+set.seed(12345)
+svm1<-train(classe~., data=training, method="svmLinear", trControl = control, tuneLength = 5, verbose = F)
+```
+Model quality:
+```{r svm1_quality}
+valid_svm1<- predict(svm1, validation)
+confmat_svm1<- confusionMatrix(valid_svm1, factor(validation$classe))
+confmat_svm1
+```
+## ACCURACY in validation datasets:
+Decision trees: 0.5251 
+Random Forest: 0.9961
+Support Vector Machine:0.7715 
+
+For validation dataset the best results were obtained with Random Forest. 
+
+## Testing Random Forest model on test dataset (20 observations)
+
+```{r prediction}
+pred_tree2<-predict(tree2, test)
+pred_tree2
+table(pred_tree2)
+```
