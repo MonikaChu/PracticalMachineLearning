@@ -1,8 +1,10 @@
 ---
 title: "Practical Machine Learning"
-author: "MC"
+author: "Monika Chuchro"
 date: "2022-10-30"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 ## Packages, language
 ```{r packages, warning=FALSE}
@@ -42,17 +44,17 @@ dim(train)
 52 variables left after preprocessing
 
 ## Data analysis
-Pearson correlation coefficient
+Pearson correlation coefficient will present relations between pairs of variables.
 ```{r correlation}
 p_cor<-round(cor(train[,-52]),2)
 corrplot(p_cor, order = "hclust" , type = "upper",tl.cex = 0.5)
 high_corr<-findCorrelation(p_cor, cutoff=0.75)
 names(train)[high_corr]
 ```
-The more intensive correlation color and the bigger dot is presened, the higher correlation is observed between pair of variables. The highest negative Pearson's correlation coefficient is between pitch_belt and accel_belt_x (-0.97), accel_belt_z and total_accel_belt (-0.97)
+The more intensive correlation color and the bigger dot is presened, the higher correlation is observed between pair of variables. The highest negative Pearson's correlation coefficient is between pitch_belt and accel_belt_x (-0.97), accel_belt_z and total_accel_belt (-0.97).
 
 ## Modeling
-Divinding data (train dataset) into training and validation dataset 
+Dividing data (train dataset) into training and validation dataset. For classification modeles quality we assess on dataset not presented in learning phase. That dataset should contain between 25% to 50% observations. In this project was used validation dataset with 30% of observations.
 
 ```{r datasets}
 partition <- createDataPartition(y=train$classe, p=0.7, list=F)
@@ -62,7 +64,7 @@ validation <- train[-partition,]
 
 Model 1: Decision tree
 random seed number (12345)
-3-fold cross validation
+3-fold cross validation randomly splits the data into V groups of roughly equal size. A resample of the analysis data consists of V-1 of the folds while the assessment set contains the final fold.
 
 ```{r tree1}
 set.seed(12345)
@@ -106,6 +108,9 @@ confmat_svm1
 Decision trees: 0.5251 
 Random Forest: 0.9961
 Support Vector Machine:0.7715 
+Out of bag error for Decision Tree and Suport Vector Machine is ~0.3, for Random Forest ~0.
+There is posibility that Random Forest model is overfitting.
+
 
 For validation dataset the best results were obtained with Random Forest. 
 
