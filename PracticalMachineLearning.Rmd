@@ -1,9 +1,18 @@
 ---
 title: "Practical Machine Learning"
-author: "MC"
+author: "Monika Chuchro"
 date: "2022-10-30"
-output: html_document
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
 ---
+## Description
+Data in this project are from accelerometers on the belt,arm, forearm, and dumbell of 6 participants. Models have to predict the manner in which participants moved.
+Main variable is qualitative variable (5 levels) so classification models will be used. Chosen classification models: (1)decision tree, (2)random forest, (3)support vector machine and (4)generalized boosted model. 
+Model quality will be checked using V-fold cross validation on traing dataset and with accuracy and out of sample error rate.
+More info: http://groupware.les.inf.puc-rio.br/har
+
 ## Packages, language
 ```{r packages, warning=FALSE}
 Sys.setlocale("LC_ALL", "English")
@@ -13,11 +22,12 @@ library(corrplot)
 library(rattle)
 library(randomForest)
 library(kernlab)
+library(gbm)
 set.seed(12345)
 ```
 
 ## Data import, datasets
-Importing data into 2 data sets.
+Importing data into 2 data sets: train for modeling and quality check, test for prediction.
 
 ```{r import, warning=FALSE}
 
@@ -29,7 +39,7 @@ dim(test)
 ```
 ## Preprocessing
 Variables have a high number of NA, Near Zero Variance (NZV) and Id. Preprocessing will removed them.
-removing NA column (mostly NA values, and columns with metadata)
+Removing NA column (mostly NA values, and columns with metadata).
 ```{r preprocessing}
 nvz <- nearZeroVar(train)
 train <- train[,-nvz]
@@ -39,31 +49,33 @@ train <- train[,-c(1:7)]
 dim(train)
 
 ```
-52 variables left after preprocessing
+52 variables left after preprocessing.
 
 ## Data analysis
-Pearson correlation coefficient
+Pearson correlation coefficient will present relations between pairs of variables.
 ```{r correlation}
 p_cor<-round(cor(train[,-52]),2)
 corrplot(p_cor, order = "hclust" , type = "upper",tl.cex = 0.5)
 high_corr<-findCorrelation(p_cor, cutoff=0.75)
 names(train)[high_corr]
 ```
-The more intensive correlation color and the bigger dot is presened, the higher correlation is observed between pair of variables. The highest negative Pearson's correlation coefficient is between pitch_belt and accel_belt_x (-0.97), accel_belt_z and total_accel_belt (-0.97)
+The more intensive correlation color and the bigger dot is presened, the higher correlation is observed between pair of variables. The highest negative Pearson's correlation coefficient is between pitch_belt and accel_belt_x (-0.97), accel_belt_z and total_accel_belt (-0.97).
 
 ## Modeling
-Divinding data (train dataset) into training and validation dataset 
+Dividing data (train dataset) into training and validation dataset. For classification modeles quality we assess on dataset not presented in learning phase. That dataset should contain between 25% to 50% observations. In this project was used validation dataset with 30% of observations.
 
 ```{r datasets}
 partition <- createDataPartition(y=train$classe, p=0.7, list=F)
 training <- train[partition,]
 validation <- train[-partition,]
 ```
+## Models
+In models I used random seed number (12345).
+Models were created with V-fold validation. I used 3-fold cross validation randomly splits the data into 3 groups of roughly equal size. A resample of the analysis data consists of 2 of the folds while the assessment set contains the final fold.
+Models quality were checked using validation dataset with confusion matrix, accuracy and out of sample error. 
 
-Model 1: Decision tree
-random seed number (12345)
-3-fold cross validation
-
+##Model 1: Decision tree
+First model is binary decision tree created using 13737 observations. 
 ```{r tree1}
 set.seed(12345)
 control <- trainControl(method="cv", number=3, verboseIter=FALSE)
@@ -77,8 +89,10 @@ valid_tree1 <- predict(tree1, validation)
 confmat_tree1<- confusionMatrix(valid_tree1, as.factor(validation$classe))
 confmat_tree1
 ```
-## Model 2: Random Forest
+Decision tree accuracy is quite low: 0.5251, and 95% CI: (0.5122, 0.5379). Good prediction only for Class A.
 
+## Model 2: Random Forest
+The second model is Random Forest, with n=500 trees.
 ```{r tree2}
 set.seed(12345)
 tree2 <- train(classe~., data=training, method="rf", trControl = control, tuneLength = 5)
@@ -90,6 +104,7 @@ valid_tree2<- predict(tree2, validation)
 confmat_tree2<- confusionMatrix(valid_tree2, as.factor(validation$classe))
 confmat_tree2
 ```
+Random Forest has very high accuracy : 0.9961 and 95% CI : (0.9941, 0.9975). Like the first model the best prediction results were obtaoned for Class A.
 
 ## Model 3: Support Vector Machine
 ```{r svm}
@@ -102,10 +117,41 @@ valid_svm1<- predict(svm1, validation)
 confmat_svm1<- confusionMatrix(valid_svm1, factor(validation$classe))
 confmat_svm1
 ```
+SVM model has better result than 1 model. Accuracy is 0.7715 and
+                 95% CI : (0.7605, 0.7821). We obtain very good result in prediction Class A: 0.9295.
+                 
+## Model 4:Generalized Boosted Model
+GBM A gradient boosted model with multinomial loss function with 
+150 iterations.
+There were 51 predictors of which 51 had non-zero influence
+```{r gbm1}
+set.seed(12345)
+gbm1<- train(classe ~ ., data = training, method = "gbm",
+                  trControl = control, verbose = FALSE)
+gbm1$finalModel
+```
+Model quality:
+```{r gbm1_quality}
+valid_gbm1 <- predict(gbm1, newdata = validation)
+confmat_gbm1<- confusionMatrix(valid_gbm1, factor(validation$classe))
+confmat_gbm1
+```
+GBM: quality in validation dateset is very high: Accuracy is 0.9585 and 95% CI : (0.9531, 0.9635).
+
 ## ACCURACY in validation datasets:
 Decision trees: 0.5251 
-Random Forest: 0.9961
-Support Vector Machine:0.7715 
+Random Forest: 0.9961 - 1st place
+Support Vector Machine: 0.7715 
+Generalized Boosted Model: 0.9585
+
+The expected out-of-sample error correspond to the quantity: 1-accuracy in the cross-validation data. Expected value of the out-of-sample error correspond to the expected number of missclassified observations/total observations in the validation dataset.
+Decision trees: ~0.48
+Random Forest: ~0.004
+Support Vector Machine: ~0.23
+Generalized Boosted Model: ~0.04
+
+There is posibility that Random Forest model is overfitted.
+
 
 For validation dataset the best results were obtained with Random Forest. 
 
